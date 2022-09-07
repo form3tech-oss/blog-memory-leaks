@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/pprof"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -10,22 +13,11 @@ import (
 	"go.opentelemetry.io/otel/exporters/zipkin"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"net/http"
-	"net/http/pprof"
 )
 
 func handle(c *gin.Context) {
 	c.Status(200)
 	_, _ = c.Writer.Write([]byte("OK\n"))
-}
-
-type handler struct {
-	c *gin.Context
-}
-
-func (h *handler) ServeHTTP(w http.ResponseWriter, request *http.Request) {
-	h.c.Request = request
-	h.c.Next()
 }
 
 func main() {
@@ -37,14 +29,11 @@ func main() {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		fmt.Println("middleware")
-		h := &handler{c: c}
-		handlerWithMetrics := otelhttp.NewHandler(h, "root")
-		handlerWithMetrics.ServeHTTP(c.Writer, c.Request)
 	})
 	router.GET("/", handle)
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	router.GET("/debug/pprof/*profile", gin.WrapF(pprof.Index))
-	err = router.Run(":8080")
+	err = http.ListenAndServe(":8080", otelhttp.NewHandler(router.Handler(), "root"))
 	if err != nil {
 		panic(err)
 	}
