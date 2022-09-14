@@ -1,0 +1,31 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.36.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  zipkin:
+    image: openzipkin/zipkin:2.23
+    ports:
+      - "9411:9411"
+    environment:
+      MEM_MAX_SPANS: 1000
+
+  leaker:
+    image: golang:1.18.3
+    entrypoint: go run ./...
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/app:rw
+    working_dir: /app
+
+  client:
+    image: curlimages/curl:7.83.1
+    volumes:
+      - ./client.sh:/client.sh
+    entrypoint: /client.sh
+    environment:
+      URL: http://leaker:8080
